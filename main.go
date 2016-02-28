@@ -6,12 +6,14 @@ import (
 	"log"
 	"os"
 
+	"github.com/TransactPRO/workshop-golang-19032016/client"
 	"github.com/TransactPRO/workshop-golang-19032016/server"
 	"github.com/TransactPRO/workshop-golang-19032016/ui"
 	"github.com/TransactPRO/workshop-golang-19032016/util"
 )
 
 var (
+	userName   = flag.String("u", "", "master host")
 	masterMode = flag.Bool("m", false, "run in master mode")
 	masterHost = flag.String("master-host", "127.0.0.1", "master host")
 	httpPort   = flag.Int("http-port", 8081, "master's HTTP port")
@@ -22,6 +24,7 @@ var (
 	gui   *ui.UI
 	srv   *server.Server
 	l     *server.Listener
+	c     *client.Client
 	msgCh = make(chan util.Message)
 )
 
@@ -37,17 +40,25 @@ func shutdown() {
 		l.Stop()
 	}
 
+	if c != nil {
+		c.Close()
+	}
+
 	os.Exit(0)
 }
 
 func processIncomingMessages() {
 	for msg := range msgCh {
-		gui.WriteToChat(fmt.Sprintf("[%s] %s: %s", util.ParseTime(msg.Timestamp), msg.User, msg.Contents))
+		gui.WriteToView(ui.ChatView, fmt.Sprintf("[%s] %s: %s", util.ParseTime(msg.Timestamp), msg.User, msg.Contents))
 	}
 }
 
 func main() {
 	flag.Parse()
+
+	if *userName == "" {
+		log.Fatal("provide the username!")
+	}
 
 	var err error
 
@@ -63,12 +74,19 @@ func main() {
 		go processIncomingMessages()
 
 		// Create a new TCP listener.
-		l, err = server.NewListener(*tcpPort)
+		l, err = server.NewListener(*tcpPort, func(newUser string) {
+			gui.WriteToView(ui.UsersView, newUser)
+		})
 		if err != nil {
 			log.Fatal(err)
 		}
 		// Start the listener.
 		l.Start()
+	} else {
+		c, err = client.NewClient(*userName, *masterHost, *tcpPort)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	gui, err = ui.DeployGUI(shutdown)

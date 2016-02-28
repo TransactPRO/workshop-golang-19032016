@@ -14,10 +14,14 @@ type Listener struct {
 	done              chan bool
 	doneAck           chan bool
 	activeConnections map[string]*net.TCPConn
+	cn                ConnnectionNotifier
 }
 
+// ConnnectionNotifier is being called on every new connection.
+type ConnnectionNotifier func(string)
+
 // NewListener returns new TCP listener.
-func NewListener(port int) (l *Listener, err error) {
+func NewListener(port int, cn ConnnectionNotifier) (l *Listener, err error) {
 	var tcpAddr *net.TCPAddr
 	tcpAddr, err = net.ResolveTCPAddr("tcp4", ":"+strconv.Itoa(port))
 	if err != nil {
@@ -35,6 +39,7 @@ func NewListener(port int) (l *Listener, err error) {
 		done:              make(chan bool),
 		doneAck:           make(chan bool),
 		activeConnections: make(map[string]*net.TCPConn),
+		cn:                cn,
 	}
 
 	return
@@ -70,7 +75,8 @@ func (l *Listener) Start() {
 			}
 
 			userName := strings.Replace(result, "\n", "", -1)
-			log.Println(userName, "connected")
+
+			l.cn(userName)
 
 			l.activeConnections[userName] = tcpConn
 		}

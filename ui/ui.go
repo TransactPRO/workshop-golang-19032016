@@ -9,9 +9,8 @@ import (
 
 // UI contains the UI data.
 type UI struct {
-	Gui      *gocui.Gui
-	sh       shutdownHandler
-	chatView *gocui.View
+	gui *gocui.Gui
+	sh  shutdownHandler
 }
 
 type shutdownHandler func()
@@ -35,7 +34,7 @@ func DeployGUI(sh shutdownHandler) (ui *UI, err error) {
 	}
 
 	ui = &UI{
-		Gui: g,
+		gui: g,
 		sh:  sh,
 	}
 
@@ -67,10 +66,10 @@ func DeployGUI(sh shutdownHandler) (ui *UI, err error) {
 	return
 }
 
-// WriteToChat writes the message into the chat view.
-func (u *UI) WriteToChat(msg string) {
-	u.Gui.Execute(func(g *gocui.Gui) error {
-		v, err := g.View(ChatView)
+// WriteToView writes the message into the requested view.
+func (u *UI) WriteToView(view, msg string) {
+	u.gui.Execute(func(g *gocui.Gui) error {
+		v, err := g.View(view)
 		if err != nil {
 			return err
 		}
@@ -90,7 +89,7 @@ func (u *UI) layout(g *gocui.Gui) (err error) {
 	}
 
 	// Setting the chat history view.
-	u.chatView, err = g.SetView(ChatView, maxX/5+1, 0, maxX-1, maxY*4/5)
+	_, err = g.SetView(ChatView, maxX/5+1, 0, maxX-1, maxY*4/5)
 	if err != nil && err != gocui.ErrUnknownView {
 		return
 	}
