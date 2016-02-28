@@ -14,12 +14,14 @@ import (
 var (
 	masterMode = flag.Bool("m", false, "run in master mode")
 	masterHost = flag.String("master-host", "127.0.0.1", "master host")
-	masterPort = flag.Int("master-port", 8081, "master HTTP port")
+	httpPort   = flag.Int("http-port", 8081, "master's HTTP port")
+	tcpPort    = flag.Int("tcp-port", 8082, "master's TCP port")
 )
 
 var (
 	gui   *ui.UI
 	srv   *server.Server
+	l     *server.Listener
 	msgCh = make(chan util.Message)
 )
 
@@ -29,6 +31,10 @@ func shutdown() {
 
 	if srv != nil {
 		srv.Stop()
+	}
+
+	if l != nil {
+		l.Stop()
 	}
 
 	os.Exit(0)
@@ -43,19 +49,31 @@ func processIncomingMessages() {
 func main() {
 	flag.Parse()
 
+	var err error
+
 	if *masterMode {
 		// Create a new server with the desired parameters.
-		srv = server.New("/", *masterPort, msgCh)
+		srv = server.New("/", *httpPort, msgCh)
 		// Start the server (initialize the TCP listener).
-		srv.Start()
+		err = srv.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
 		// The server writes the incoming data to the "msgCh" channel.
 		go processIncomingMessages()
+
+		// Create a new TCP listener.
+		l, err = server.NewListener(*tcpPort)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Start the listener.
+		l.Start()
 	}
 
-	var guiErr error
-	gui, guiErr = ui.DeployGUI(shutdown)
-	if guiErr != nil {
-		log.Fatal(guiErr)
+	gui, err = ui.DeployGUI(shutdown)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	select {}
