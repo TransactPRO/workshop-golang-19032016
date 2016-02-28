@@ -2,10 +2,13 @@ package server
 
 import (
 	"bufio"
+	"encoding/json"
 	"log"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/TransactPRO/workshop-golang-19032016/util"
 )
 
 // Listener contains TCP listener's data.
@@ -81,6 +84,22 @@ func (l *Listener) Start() {
 			l.activeConnections[userName] = tcpConn
 		}
 	}()
+}
+
+// SendToClients sends the message to connected clients.
+func (l *Listener) SendToClients(cmd util.Command) {
+	byteData, err := json.Marshal(cmd)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for user, conn := range l.activeConnections {
+		if user != cmd.OriginUser {
+			_, connErr := conn.Write(append(byteData, '\n'))
+			if connErr != nil {
+				delete(l.activeConnections, user)
+			}
+		}
+	}
 }
 
 // Stop stops active TCP listener.

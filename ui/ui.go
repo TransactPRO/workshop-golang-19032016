@@ -9,8 +9,9 @@ import (
 
 // UI contains the UI data.
 type UI struct {
-	gui *gocui.Gui
-	sh  shutdownHandler
+	gui   *gocui.Gui
+	sh    shutdownHandler
+	msgCh chan string
 }
 
 type shutdownHandler func()
@@ -25,7 +26,7 @@ const (
 )
 
 // DeployGUI deploys the GUI.
-func DeployGUI(sh shutdownHandler) (ui *UI, err error) {
+func DeployGUI(sh shutdownHandler, msgCh chan string) (ui *UI, err error) {
 	// Initializing a new GUI.
 	g := gocui.NewGui()
 	err = g.Init()
@@ -34,8 +35,9 @@ func DeployGUI(sh shutdownHandler) (ui *UI, err error) {
 	}
 
 	ui = &UI{
-		gui: g,
-		sh:  sh,
+		gui:   g,
+		sh:    sh,
+		msgCh: msgCh,
 	}
 
 	// Setting the desired layout by passing the corresponding handler to the GUI method.
@@ -43,6 +45,12 @@ func DeployGUI(sh shutdownHandler) (ui *UI, err error) {
 
 	// Setting Ctr+C binding.
 	err = g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit)
+	if err != nil {
+		return
+	}
+
+	// Setting Ctr+S binding.
+	err = g.SetKeybinding(TextView, gocui.KeyCtrlS, gocui.ModNone, ui.processText)
 	if err != nil {
 		return
 	}
@@ -108,6 +116,14 @@ func (u *UI) layout(g *gocui.Gui) (err error) {
 		return
 	}
 
+	return
+}
+
+func (u *UI) processText(g *gocui.Gui, v *gocui.View) (err error) {
+	bufferStr := v.ViewBuffer()
+	u.msgCh <- bufferStr[:len(bufferStr)-1]
+	v.Clear()
+	v.SetCursor(0, 0)
 	return
 }
 

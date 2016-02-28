@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+// Command contains command data.
+type Command struct {
+	ID         string
+	OriginUser string
+	Message    Message
+}
+
 // Message contains message data.
 type Message struct {
 	User      string

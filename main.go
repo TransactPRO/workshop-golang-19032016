@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/TransactPRO/workshop-golang-19032016/client"
 	"github.com/TransactPRO/workshop-golang-19032016/server"
@@ -21,11 +22,12 @@ var (
 )
 
 var (
-	gui   *ui.UI
-	srv   *server.Server
-	l     *server.Listener
-	c     *client.Client
-	msgCh = make(chan util.Message)
+	gui     *ui.UI
+	srv     *server.Server
+	l       *server.Listener
+	c       *client.Client
+	msgCh   = make(chan util.Message)
+	myMsgCh = make(chan string)
 )
 
 // shutdown stops all the running services and terminates the process.
@@ -47,9 +49,41 @@ func shutdown() {
 	os.Exit(0)
 }
 
-func processIncomingMessages() {
+func writeToChatView(msg util.Message) {
+	gui.WriteToView(ui.ChatView, fmt.Sprintf("[%s] %s: %s", util.ParseTime(msg.Timestamp), msg.User, msg.Contents))
+}
+
+func processClientsMessages() {
 	for msg := range msgCh {
-		gui.WriteToView(ui.ChatView, fmt.Sprintf("[%s] %s: %s", util.ParseTime(msg.Timestamp), msg.User, msg.Contents))
+		writeToChatView(msg)
+		if *masterMode {
+			l.SendToClients(util.Command{
+				ID:         "MSG",
+				OriginUser: msg.User,
+				Message:    msg,
+			})
+		}
+	}
+}
+
+func processMyMessages() {
+	for msgStr := range myMsgCh {
+		msg := util.Message{
+			User:      *userName,
+			Contents:  msgStr,
+			Timestamp: time.Now(),
+		}
+		writeToChatView(msg)
+		if *masterMode {
+			l.SendToClients(util.Command{
+				ID:         "MSG",
+				OriginUser: *userName,
+				Message:    msg,
+			})
+		} else {
+			c.SendMessageToMaster(msg, *masterHost, *httpPort)
+		}
+
 	}
 }
 
@@ -70,8 +104,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		// The server writes the incoming data to the "msgCh" channel.
-		go processIncomingMessages()
 
 		// Create a new TCP listener.
 		l, err = server.NewListener(*tcpPort, func(newUser string) {
@@ -83,16 +115,22 @@ func main() {
 		// Start the listener.
 		l.Start()
 	} else {
-		c, err = client.NewClient(*userName, *masterHost, *tcpPort)
+		c, err = client.NewClient(*userName, *masterHost, *tcpPort, msgCh)
 		if err != nil {
 			log.Fatal(err)
 		}
+		c.ListenToMasterCommands()
 	}
 
-	gui, err = ui.DeployGUI(shutdown)
+	// Writing the incoming data to the "msgCh" channel.
+	go processClientsMessages()
+
+	gui, err = ui.DeployGUI(shutdown, myMsgCh)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	go processMyMessages()
 
 	select {}
 }
