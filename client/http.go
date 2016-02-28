@@ -10,7 +10,8 @@ import (
 
 // SendMessageToMaster sends the message to master.
 func (c *Client) SendMessageToMaster(msg util.Message, host string, port int) {
-	_, err := http.Get("http://" + host + ":" + strconv.Itoa(port) + "/?user=" + msg.User + "&msg=" + msg.Contents)
+	encodedMsg := util.EncodeMessage(msg.Contents)
+	_, err := http.Get("http://" + host + ":" + strconv.Itoa(port) + "/?user=" + msg.User + "&msg=" + encodedMsg)
 	if err != nil {
 		log.Println(err)
 	}

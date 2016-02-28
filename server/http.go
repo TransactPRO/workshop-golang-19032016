@@ -29,7 +29,8 @@ func New(endpont string, port int, messages chan util.Message) *Server {
 func (s *Server) handler(w http.ResponseWriter, r *http.Request) {
 	// Parsing the reuest data.
 	userName := r.FormValue("user")
-	message := r.FormValue("msg")
+
+	message := util.DecodeMessage(r.FormValue("msg"))
 
 	returnError := func(msg string, statusCode int) {
 		w.WriteHeader(statusCode)
