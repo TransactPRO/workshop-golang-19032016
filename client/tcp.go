@@ -13,13 +13,14 @@ import (
 
 // Client contains TCP client's data.
 type Client struct {
-	conn   *net.TCPConn
-	reader *bufio.Reader
-	msgCh  chan util.Message
+	conn       *net.TCPConn
+	reader     *bufio.Reader
+	msgCh      chan util.Message
+	newUsersCh chan string
 }
 
 // NewClient returns new TCP client connection.
-func NewClient(userName, host string, port int, msgCh chan util.Message) (client *Client, err error) {
+func NewClient(userName, host string, port int, msgCh chan util.Message, newUsersCh chan string) (client *Client, err error) {
 	var tcpAddr *net.TCPAddr
 	tcpAddr, err = net.ResolveTCPAddr("tcp4", host+":"+strconv.Itoa(port))
 	if err != nil {
@@ -35,16 +36,27 @@ func NewClient(userName, host string, port int, msgCh chan util.Message) (client
 	conn.Write([]byte(userName + "\n"))
 
 	client = &Client{
-		conn:   conn,
-		reader: bufio.NewReader(conn),
-		msgCh:  msgCh,
+		conn:       conn,
+		reader:     bufio.NewReader(conn),
+		msgCh:      msgCh,
+		newUsersCh: newUsersCh,
 	}
 
 	return
 }
 
 // ListenToMasterCommands receives master commands.
-func (c *Client) ListenToMasterCommands() {
+func (c *Client) ListenToMasterCommands() (initUsers []string) {
+	initResult, err := c.reader.ReadBytes('\n')
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	initErrr := json.Unmarshal(initResult, &initUsers)
+	if initErrr != nil {
+		log.Fatal(initErrr)
+	}
+
 	go func() {
 		for {
 			result, err := c.reader.ReadBytes('\n')
@@ -69,10 +81,12 @@ func (c *Client) ListenToMasterCommands() {
 			case "MSG":
 				c.msgCh <- cmd.Message
 			case "USER":
-
+				c.newUsersCh <- cmd.OriginUser
 			}
 		}
 	}()
+
+	return
 }
 
 // Close closes the client connection.

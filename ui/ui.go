@@ -121,6 +121,9 @@ func (u *UI) layout(g *gocui.Gui) (err error) {
 
 func (u *UI) processText(g *gocui.Gui, v *gocui.View) (err error) {
 	bufferStr := v.ViewBuffer()
+	if bufferStr == "" {
+		return
+	}
 	u.msgCh <- bufferStr[:len(bufferStr)-1]
 	v.Clear()
 	v.SetCursor(0, 0)

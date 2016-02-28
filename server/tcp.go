@@ -18,13 +18,14 @@ type Listener struct {
 	doneAck           chan bool
 	activeConnections map[string]*net.TCPConn
 	cn                ConnnectionNotifier
+	userName          string
 }
 
 // ConnnectionNotifier is being called on every new connection.
-type ConnnectionNotifier func(string)
+type ConnnectionNotifier func(string, bool)
 
 // NewListener returns new TCP listener.
-func NewListener(port int, cn ConnnectionNotifier) (l *Listener, err error) {
+func NewListener(port int, cn ConnnectionNotifier, userName string) (l *Listener, err error) {
 	var tcpAddr *net.TCPAddr
 	tcpAddr, err = net.ResolveTCPAddr("tcp4", ":"+strconv.Itoa(port))
 	if err != nil {
@@ -43,8 +44,18 @@ func NewListener(port int, cn ConnnectionNotifier) (l *Listener, err error) {
 		doneAck:           make(chan bool),
 		activeConnections: make(map[string]*net.TCPConn),
 		cn:                cn,
+		userName:          userName,
 	}
 
+	return
+}
+
+func (l *Listener) getListOfActiveUsers() (data []byte, err error) {
+	users := []string{l.userName}
+	for user := range l.activeConnections {
+		users = append(users, user)
+	}
+	data, err = json.Marshal(users)
 	return
 }
 
@@ -79,9 +90,16 @@ func (l *Listener) Start() {
 
 			userName := strings.Replace(result, "\n", "", -1)
 
-			l.cn(userName)
+			l.cn(userName, true)
 
 			l.activeConnections[userName] = tcpConn
+
+			userNames, userNamesErr := l.getListOfActiveUsers()
+			if userNamesErr != nil {
+				log.Println("failed to generate a list of active users:" + userNamesErr.Error())
+				continue
+			}
+			tcpConn.Write(append(userNames, '\n'))
 		}
 	}()
 }

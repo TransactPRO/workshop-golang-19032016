@@ -22,12 +22,13 @@ var (
 )
 
 var (
-	gui     *ui.UI
-	srv     *server.Server
-	l       *server.Listener
-	c       *client.Client
-	msgCh   = make(chan util.Message)
-	myMsgCh = make(chan string)
+	gui        *ui.UI
+	srv        *server.Server
+	l          *server.Listener
+	c          *client.Client
+	msgCh      = make(chan util.Message)
+	myMsgCh    = make(chan string)
+	newUsersCh = make(chan string)
 )
 
 // shutdown stops all the running services and terminates the process.
@@ -87,6 +88,22 @@ func processMyMessages() {
 	}
 }
 
+func processNewUsers() {
+	for user := range newUsersCh {
+		processNewUser(user, false)
+	}
+}
+
+func processNewUser(newUser string, notifyClients bool) {
+	gui.WriteToView(ui.UsersView, newUser)
+	if notifyClients {
+		l.SendToClients(util.Command{
+			ID:         "USER",
+			OriginUser: newUser,
+		})
+	}
+}
+
 func main() {
 	flag.Parse()
 
@@ -95,6 +112,11 @@ func main() {
 	}
 
 	var err error
+
+	gui, err = ui.DeployGUI(shutdown, myMsgCh)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if *masterMode {
 		// Create a new server with the desired parameters.
@@ -106,29 +128,30 @@ func main() {
 		}
 
 		// Create a new TCP listener.
-		l, err = server.NewListener(*tcpPort, func(newUser string) {
-			gui.WriteToView(ui.UsersView, newUser)
-		})
+		l, err = server.NewListener(*tcpPort, processNewUser, *userName)
 		if err != nil {
 			log.Fatal(err)
 		}
 		// Start the listener.
 		l.Start()
 	} else {
-		c, err = client.NewClient(*userName, *masterHost, *tcpPort, msgCh)
+		c, err = client.NewClient(*userName, *masterHost, *tcpPort, msgCh, newUsersCh)
 		if err != nil {
 			log.Fatal(err)
 		}
-		c.ListenToMasterCommands()
+		initUsers := c.ListenToMasterCommands()
+		for _, initUser := range initUsers {
+			if initUser != *userName {
+				processNewUser(initUser, false)
+			}
+		}
+		go processNewUsers()
 	}
 
 	// Writing the incoming data to the "msgCh" channel.
 	go processClientsMessages()
 
-	gui, err = ui.DeployGUI(shutdown, myMsgCh)
-	if err != nil {
-		log.Fatal(err)
-	}
+	processNewUser(*userName, false)
 
 	go processMyMessages()
 
