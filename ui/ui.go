@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/jroimartin/gocui"
@@ -8,8 +9,9 @@ import (
 
 // UI contains the UI data.
 type UI struct {
-	Gui *gocui.Gui
-	sh  shutdownHandler
+	Gui      *gocui.Gui
+	sh       shutdownHandler
+	chatView *gocui.View
 }
 
 type shutdownHandler func()
@@ -32,8 +34,13 @@ func DeployGUI(sh shutdownHandler) (ui *UI, err error) {
 		return
 	}
 
+	ui = &UI{
+		Gui: g,
+		sh:  sh,
+	}
+
 	// Setting the desired layout by passing the corresponding handler to the GUI method.
-	g.SetLayout(layout)
+	g.SetLayout(ui.layout)
 
 	// Setting Ctr+C binding.
 	err = g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit)
@@ -57,15 +64,22 @@ func DeployGUI(sh shutdownHandler) (ui *UI, err error) {
 		ui.sh()
 	}()
 
-	ui = &UI{
-		Gui: g,
-		sh:  sh,
-	}
-
 	return
 }
 
-func layout(g *gocui.Gui) (err error) {
+// WriteToChat writes the message into the chat view.
+func (u *UI) WriteToChat(msg string) {
+	u.Gui.Execute(func(g *gocui.Gui) error {
+		v, err := g.View(ChatView)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(v, msg)
+		return nil
+	})
+}
+
+func (u *UI) layout(g *gocui.Gui) (err error) {
 	// Retrieving the terminal's size.
 	maxX, maxY := g.Size()
 
@@ -76,7 +90,7 @@ func layout(g *gocui.Gui) (err error) {
 	}
 
 	// Setting the chat history view.
-	_, err = g.SetView(ChatView, maxX/5+1, 0, maxX-1, maxY*4/5)
+	u.chatView, err = g.SetView(ChatView, maxX/5+1, 0, maxX-1, maxY*4/5)
 	if err != nil && err != gocui.ErrUnknownView {
 		return
 	}
