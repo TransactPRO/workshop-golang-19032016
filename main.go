@@ -22,13 +22,13 @@ var (
 )
 
 var (
-	gui        *ui.UI
-	srv        *server.Server
-	l          *server.Listener
-	c          *client.Client
-	msgCh      = make(chan util.Message)
-	myMsgCh    = make(chan string)
-	newUsersCh = make(chan string)
+	gui             *ui.UI
+	srv             *server.Server
+	l               *server.Listener
+	c               *client.Client
+	clientsMessages = make(chan util.Message)
+	textBoxMessages = make(chan string)
+	newUsersCh      = make(chan string)
 )
 
 // shutdown stops all the running services and terminates the process.
@@ -55,7 +55,7 @@ func writeToChatView(msg util.Message) {
 }
 
 func processClientsMessages() {
-	for msg := range msgCh {
+	for msg := range clientsMessages {
 		writeToChatView(msg)
 		if *masterMode {
 			l.SendToClients(util.Command{
@@ -68,7 +68,7 @@ func processClientsMessages() {
 }
 
 func processMyMessages() {
-	for msgStr := range myMsgCh {
+	for msgStr := range textBoxMessages {
 		msg := util.Message{
 			User:      *userName,
 			Contents:  msgStr,
@@ -113,14 +113,14 @@ func main() {
 
 	var err error
 
-	gui, err = ui.DeployGUI(shutdown, myMsgCh)
+	gui, err = ui.DeployGUI(shutdown, textBoxMessages)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if *masterMode {
 		// Create a new server with the desired parameters.
-		srv = server.New("/", *httpPort, msgCh)
+		srv = server.New("/", *httpPort, clientsMessages)
 		// Start the server (initialize the TCP listener).
 		err = srv.Start()
 		if err != nil {
@@ -135,7 +135,7 @@ func main() {
 		// Start the listener.
 		l.Start()
 	} else {
-		c, err = client.NewClient(*userName, *masterHost, *tcpPort, msgCh, newUsersCh)
+		c, err = client.NewClient(*userName, *masterHost, *tcpPort, clientsMessages, newUsersCh)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -148,7 +148,7 @@ func main() {
 		go processNewUsers()
 	}
 
-	// Writing the incoming data to the "msgCh" channel.
+	// Writing the incoming data to the "clientsMessages" channel.
 	go processClientsMessages()
 
 	processNewUser(*userName, false)
