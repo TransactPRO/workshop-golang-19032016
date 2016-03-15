@@ -1,6 +1,8 @@
 package client
 
 import (
+	"bytes"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -10,9 +12,21 @@ import (
 
 // SendMessageToMaster sends the message to master.
 func SendMessageToMaster(msg util.Message, host string, port int) {
-	encodedMsg := util.EncodeMessage(msg.Contents)
-	_, err := http.Get("http://" + host + ":" + strconv.Itoa(port) + "/?user=" + msg.User + "&msg=" + encodedMsg)
-	if err != nil {
-		log.Println(err)
+	url := "http://" + host + ":" + strconv.Itoa(port)
+
+	b, marshalErr := json.Marshal(msg)
+	if marshalErr != nil {
+		log.Println(marshalErr)
+	}
+
+	req, reqErr := http.NewRequest("POST", url, bytes.NewReader(b))
+	if reqErr != nil {
+		log.Println(reqErr)
+	}
+
+	client := new(http.Client)
+	_, doErr := client.Do(req)
+	if doErr != nil {
+		log.Println(doErr)
 	}
 }
