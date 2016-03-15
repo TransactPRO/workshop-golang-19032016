@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/TransactPRO/workshop-golang-19032016/ui"
+	"github.com/TransactPRO/workshop-golang-19032016/util"
 )
 
 var (
@@ -25,6 +27,17 @@ func shutdown() {
 	os.Exit(0)
 }
 
+func processMyMessages() {
+	for msgStr := range textBoxMessages {
+		msg := util.Message{
+			User:      *userName,
+			Contents:  msgStr,
+			Timestamp: time.Now(),
+		}
+		gui.WriteToView(ui.ChatView, fmt.Sprintf("[%s] %s: %s", util.ParseTime(msg.Timestamp), msg.User, msg.Contents))
+	}
+}
+
 func main() {
 	flag.Parse()
 
@@ -39,9 +52,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	for msg := range textBoxMessages {
-		fmt.Println(msg)
-	}
+	go processMyMessages()
 
 	select {}
 }
