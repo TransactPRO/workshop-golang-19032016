@@ -7,22 +7,31 @@ import (
 	"os"
 	"time"
 
+	"github.com/TransactPRO/workshop-golang-19032016/server"
 	"github.com/TransactPRO/workshop-golang-19032016/ui"
 	"github.com/TransactPRO/workshop-golang-19032016/util"
 )
 
 var (
-	userName = flag.String("u", "", "master host")
+	userName   = flag.String("u", "", "master host")
+	masterMode = flag.Bool("m", false, "run in master mode")
+	httpPort   = flag.Int("http-port", 8081, "master's HTTP port")
 )
 
 var (
 	gui             *ui.UI
 	textBoxMessages = make(chan string)
+	srv             *server.Server
+	clientsMessages = make(chan util.Message)
 )
 
 // shutdown stops all the running services and terminates the process.
 func shutdown() {
 	log.Println("Shutting down..")
+
+	if srv != nil {
+		srv.Stop()
+	}
 
 	os.Exit(0)
 }
@@ -50,6 +59,18 @@ func main() {
 	gui, err = ui.DeployGUI(shutdown, textBoxMessages)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if *masterMode {
+		// Create a new server with the desired parameters.
+		srv = server.New("/", *httpPort, clientsMessages)
+		// Start the server (initialize the TCP listener).
+		err = srv.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+
 	}
 
 	go processMyMessages()
