@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/TransactPRO/workshop-golang-19032016/client"
 	"github.com/TransactPRO/workshop-golang-19032016/server"
 	"github.com/TransactPRO/workshop-golang-19032016/ui"
 	"github.com/TransactPRO/workshop-golang-19032016/util"
@@ -16,6 +17,7 @@ var (
 	userName   = flag.String("u", "", "master host")
 	masterMode = flag.Bool("m", false, "run in master mode")
 	httpPort   = flag.Int("http-port", 8081, "master's HTTP port")
+	masterHost = flag.String("master-host", "127.0.0.1", "master host")
 )
 
 var (
@@ -44,6 +46,12 @@ func processMyMessages() {
 			Timestamp: time.Now(),
 		}
 		gui.WriteToView(ui.ChatView, fmt.Sprintf("[%s] %s: %s", util.ParseTime(msg.Timestamp), msg.User, msg.Contents))
+
+		if !*masterMode {
+			client.SendMessageToMaster(msg, *masterHost, *httpPort)
+		} else {
+			//send to clients
+		}
 	}
 }
 
@@ -74,6 +82,10 @@ func main() {
 	}
 
 	go processMyMessages()
+
+	for msg := range clientsMessages {
+		fmt.Println(msg)
+	}
 
 	select {}
 }
