@@ -11,7 +11,7 @@ import (
 )
 
 // SendMessageToMaster sends the message to master.
-func (c *Client) SendMessageToMaster(msg util.Message, host string, port int) {
+func SendMessageToMaster(msg util.Message, host string, port int) {
 	url := "http://" + host + ":" + strconv.Itoa(port)
 
 	b, marshalErr := json.Marshal(msg)

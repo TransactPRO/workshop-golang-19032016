@@ -82,7 +82,7 @@ func processMyMessages() {
 				Message:    msg,
 			})
 		} else {
-			c.SendMessageToMaster(msg, *masterHost, *httpPort)
+			client.SendMessageToMaster(msg, *masterHost, *httpPort)
 		}
 
 	}
