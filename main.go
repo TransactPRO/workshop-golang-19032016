@@ -18,6 +18,7 @@ var (
 	masterMode = flag.Bool("m", false, "run in master mode")
 	httpPort   = flag.Int("http-port", 8081, "master's HTTP port")
 	masterHost = flag.String("master-host", "127.0.0.1", "master host")
+	tcpPort    = flag.Int("tcp-port", 8082, "master's TCP port")
 )
 
 var (
@@ -25,6 +26,7 @@ var (
 	textBoxMessages = make(chan string)
 	srv             *server.Server
 	clientsMessages = make(chan util.Message)
+	l               *server.Listener
 )
 
 // shutdown stops all the running services and terminates the process.
@@ -33,6 +35,10 @@ func shutdown() {
 
 	if srv != nil {
 		srv.Stop()
+	}
+
+	if l != nil {
+		l.Stop()
 	}
 
 	os.Exit(0)
@@ -61,6 +67,16 @@ func processClientsMessages() {
 	}
 }
 
+func processNewUser(newUser string, notifyClients bool) {
+	gui.WriteToView(ui.UsersView, newUser)
+	if notifyClients {
+		l.SendToClients(util.Command{
+			ID:         "USER",
+			OriginUser: newUser,
+		})
+	}
+}
+
 func main() {
 	flag.Parse()
 
@@ -83,6 +99,14 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		// Create a new TCP listener.
+		l, err = server.NewListener(*tcpPort, *userName, processNewUser)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// Start the listener.
+		l.Start()
 	} else {
 
 	}
