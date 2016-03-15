@@ -27,6 +27,8 @@ var (
 	srv             *server.Server
 	clientsMessages = make(chan util.Message)
 	l               *server.Listener
+	c               *client.Client
+	newUsersCh      = make(chan string)
 )
 
 // shutdown stops all the running services and terminates the process.
@@ -39,6 +41,10 @@ func shutdown() {
 
 	if l != nil {
 		l.Stop()
+	}
+
+	if c != nil {
+		c.Close()
 	}
 
 	os.Exit(0)
@@ -56,7 +62,11 @@ func processMyMessages() {
 		if !*masterMode {
 			client.SendMessageToMaster(msg, *masterHost, *httpPort)
 		} else {
-			//send to clients
+			l.SendToClients(util.Command{
+				ID:         "MSG",
+				OriginUser: *userName,
+				Message:    msg,
+			})
 		}
 	}
 }
@@ -64,6 +74,13 @@ func processMyMessages() {
 func processClientsMessages() {
 	for msg := range clientsMessages {
 		gui.WriteToView(ui.ChatView, fmt.Sprintf("[%s] %s: %s", util.ParseTime(msg.Timestamp), msg.User, msg.Contents))
+		if *masterMode {
+			l.SendToClients(util.Command{
+				ID:         "MSG",
+				OriginUser: msg.User,
+				Message:    msg,
+			})
+		}
 	}
 }
 
@@ -74,6 +91,12 @@ func processNewUser(newUser string, notifyClients bool) {
 			ID:         "USER",
 			OriginUser: newUser,
 		})
+	}
+}
+
+func processNewUsers() {
+	for user := range newUsersCh {
+		processNewUser(user, false)
 	}
 }
 
@@ -108,8 +131,20 @@ func main() {
 		// Start the listener.
 		l.Start()
 	} else {
-
+		c, err = client.NewClient(*userName, *masterHost, *tcpPort, clientsMessages, newUsersCh)
+		if err != nil {
+			log.Fatal(err)
+		}
+		initUsers := c.ListenToMasterCommands()
+		for _, initUser := range initUsers {
+			if initUser != *userName {
+				processNewUser(initUser, false)
+			}
+		}
+		go processNewUsers()
 	}
+
+	processNewUser(*userName, false)
 
 	go processMyMessages()
 	go processClientsMessages()
