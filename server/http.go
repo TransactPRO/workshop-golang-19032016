@@ -1,10 +1,11 @@
 package server
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/TransactPRO/workshop-golang-19032016/util"
 )
@@ -28,29 +29,34 @@ func New(endpont string, port int, messages chan util.Message) *Server {
 
 func (s *Server) handler(w http.ResponseWriter, r *http.Request) {
 	// Parsing the reuest data.
-	userName := r.FormValue("user")
-
-	message := util.DecodeMessage(r.FormValue("msg"))
-
 	returnError := func(msg string, statusCode int) {
 		w.WriteHeader(statusCode)
 		w.Write([]byte(msg))
 	}
 
+	body, bodyErr := ioutil.ReadAll(r.Body)
+	if bodyErr != nil {
+		returnError("invalid request data", http.StatusBadRequest)
+		return
+	}
+
+	var message util.Message
+	jsonErr := json.Unmarshal(body, &message)
+	if jsonErr != nil {
+		returnError("invalid request data", http.StatusBadRequest)
+		return
+	}
+
 	// Returning an error if provided message data is invalid.
-	if userName == "" || message == "" {
+	if message.User == "" || message.Contents == "" {
 		returnError("invalid username or message string", http.StatusBadRequest)
 		return
 	}
 
 	// Pushing the message in the routine because we don't want to make the client wait.
-	go func(userName, message string) {
-		s.messages <- util.Message{
-			User:      userName,
-			Contents:  message,
-			Timestamp: time.Now(),
-		}
-	}(userName, message)
+	go func() {
+		s.messages <- message
+	}()
 
 	// Telling the client that the request has been processed successfully.
 	returnError("OK", http.StatusOK)
