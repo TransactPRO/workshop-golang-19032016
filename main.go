@@ -55,6 +55,12 @@ func processMyMessages() {
 	}
 }
 
+func processClientsMessages() {
+	for msg := range clientsMessages {
+		gui.WriteToView(ui.ChatView, fmt.Sprintf("[%s] %s: %s", util.ParseTime(msg.Timestamp), msg.User, msg.Contents))
+	}
+}
+
 func main() {
 	flag.Parse()
 
@@ -82,10 +88,7 @@ func main() {
 	}
 
 	go processMyMessages()
-
-	for msg := range clientsMessages {
-		fmt.Println(msg)
-	}
+	go processClientsMessages()
 
 	select {}
 }
