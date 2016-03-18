@@ -97,10 +97,12 @@ func (u *UI) layout(g *gocui.Gui) (err error) {
 	}
 
 	// Setting the chat history view.
-	_, err = g.SetView(ChatView, maxX/5+1, 0, maxX-1, maxY*4/5)
+	var cView *gocui.View
+	cView, err = g.SetView(ChatView, maxX/5+1, 0, maxX-1, maxY*4/5)
 	if err != nil && err != gocui.ErrUnknownView {
 		return
 	}
+	cView.Autoscroll = true
 
 	// Setting the text editor view.
 	var tView *gocui.View
